@@ -1,4 +1,4 @@
-import { useTable, usePagination } from "react-table";
+import { useTable, usePagination, useSortBy } from "react-table";
 
 const Table = ({ columns, data }) => {
   const {
@@ -22,21 +22,30 @@ const Table = ({ columns, data }) => {
       data,
       initialState: { pageIndex: 0, pageSize: 10 }, // here we set the number of rows per page to be 10
     },
+    useSortBy,
     usePagination
   );
 
   return (
     <div className="space-y-4">
-      <table {...getTableProps()} className="w-full divide-y divide-gray-200">
+         <table {...getTableProps()} className="w-full divide-y divide-gray-200">
         <thead>
           {headerGroups.map((headerGroup) => (
             <tr {...headerGroup.getHeaderGroupProps()} className="bg-gray-50">
               {headerGroup.headers.map((column) => (
                 <th
-                  {...column.getHeaderProps()}
+                  {...column.getHeaderProps(column.getSortByToggleProps())} // allow toggling sort
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   {column.render("Header")}
+                  {/* Add a sort direction indicator */}
+                  <span>
+                    {column.isSorted
+                      ? column.isSortedDesc
+                        ? " 🔽"
+                        : " 🔼"
+                      : ""}
+                  </span>
                 </th>
               ))}
             </tr>
