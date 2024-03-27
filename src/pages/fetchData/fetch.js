@@ -4,13 +4,32 @@ import {
 } from "../../lib/resolvers/query";
 
 export const fetchData = async (client) => {
-  const [answeredUsernamesData, allDiscussionsData] = await Promise.all([
+  let [answeredUsernamesData, allDiscussionsData] = await Promise.all([
     client.query({ query: fetchDiscussionsWithAnsweredAuthor }),
     client.query({ query: fetchAllDiscussions }),
   ]);
 
+  const maxAttempts = 20;
+  let hasNextPage = allDiscussionsData.data.repository.discussions.pageInfo.hasNextPage;
+  let cursor = allDiscussionsData.data.repository.discussions.pageInfo.endCursor;
+  let currentAttempt = 1;
+  let edges = [...allDiscussionsData.data.repository.discussions.edges];
+
+  while (hasNextPage && currentAttempt < maxAttempts) {
+    const moreDiscussionsData = await client.query({
+      query: fetchAllDiscussions,
+      variables: { cursor }
+    });
+
+    edges = [ ...edges, ...moreDiscussionsData.data.repository.discussions.edges]
+
+    hasNextPage = moreDiscussionsData.data.repository.discussions.pageInfo.hasNextPage;
+    cursor = moreDiscussionsData.data.repository.discussions.pageInfo.endCursor;
+    currentAttempt += 1;
+  }
+  
   let userPostsCount =
-    allDiscussionsData.data.repository.discussions.edges.reduce((acc, edge) => {
+    edges.reduce((acc, edge) => {
       let login = edge.node.author.login;
       if (!acc[login]) {
         acc[login] = { answeredPosts: 0, postsMade: 1 };
@@ -20,8 +39,26 @@ export const fetchData = async (client) => {
       return acc;
     }, {});
 
+  hasNextPage = answeredUsernamesData.data.repository.discussions.pageInfo.hasNextPage;
+  cursor = answeredUsernamesData.data.repository.discussions.pageInfo.endCursor;
+  currentAttempt = 1;
+  edges = [...answeredUsernamesData.data.repository.discussions.edges];
+
+  while (hasNextPage && currentAttempt < maxAttempts) {
+    const moreDiscussionsData = await client.query({
+      query: fetchDiscussionsWithAnsweredAuthor,
+      variables: { cursor }
+    });
+
+    edges = [ ...edges, ...moreDiscussionsData.data.repository.discussions.edges]
+
+    hasNextPage = moreDiscussionsData.data.repository.discussions.pageInfo.hasNextPage;
+    cursor = moreDiscussionsData.data.repository.discussions.pageInfo.endCursor;
+    currentAttempt += 1;
+  }
+
   let userAnswersCount =
-    answeredUsernamesData.data.repository.discussions.edges.reduce(
+    edges.reduce(
       (acc, edge) => {
         if (edge.node.answer && edge.node.answer.author) {
           let login = edge.node.answer.author.login;
